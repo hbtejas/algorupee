@@ -1,0 +1,43 @@
+# Docker compose setup for AI stock analyzer stack
+version: "3.9"
+
+services:
+  client:
+    build: ./client
+    container_name: stock-client
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:5000
+    depends_on:
+      - server
+
+  server:
+    build: ./server
+    container_name: stock-server
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./server/.env
+    depends_on:
+      - mongodb
+      - ml-engine
+
+  ml-engine:
+    build: ./ml-engine
+    container_name: stock-ml-engine
+    ports:
+      - "5001:5001"
+    env_file:
+      - ./ml-engine/.env
+
+  mongodb:
+    image: mongo:7
+    container_name: stock-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:

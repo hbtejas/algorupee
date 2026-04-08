@@ -1,0 +1,18 @@
+# Python dependencies for stock analysis ML engine
+flask
+flask-cors
+yfinance
+pandas
+numpy
+scikit-learn
+xgboost
+ta
+vaderSentiment
+textblob
+requests
+beautifulsoup4
+joblib
+python-dotenv
+kiteconnect
+apscheduler
+pytz
