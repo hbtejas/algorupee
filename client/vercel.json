@@ -1,5 +1,14 @@
 {
+  "functions": {
+    "api/[...path].js": {
+      "runtime": "nodejs20.x"
+    }
+  },
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
     {
       "source": "/((?!api|assets|favicon.ico|vite.svg).*)",
       "destination": "/index.html"
