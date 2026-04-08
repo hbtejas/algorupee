@@ -11,6 +11,25 @@ import { useRealtimeStocks } from "../hooks/useRealtimeStocks";
 import { analysisApi, getApiError } from "../utils/api";
 
 /**
+ * Convert unknown error payloads into safe display text.
+ * @param {any} value
+ * @returns {string}
+ */
+function toDisplayError(value) {
+  if (!value) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch (_) {
+    return String(value);
+  }
+}
+
+/**
  * Dedicated sector analysis page.
  * @returns {JSX.Element}
  */
@@ -30,6 +49,7 @@ export default function SectorAnalysis() {
   const [compareOpen, setCompareOpen] = useState(false);
   const [pageError, setPageError] = useState("");
   const detailRef = useRef(null);
+  const visibleError = toDisplayError(error || pageError);
 
   const { stocks, loading: stocksLoading } = useRealtimeStocks(selectedSector || focusSector, 10);
 
@@ -221,7 +241,7 @@ export default function SectorAnalysis() {
         </select>
       </div>
 
-      {(error || pageError) && <p className="text-sm text-sell">{error || pageError}</p>}
+      {visibleError && <p className="text-sm text-sell">{visibleError}</p>}
       {loading && <p className="text-sm text-white/70">Loading sector data...</p>}
 
       {view === "overview" && (
