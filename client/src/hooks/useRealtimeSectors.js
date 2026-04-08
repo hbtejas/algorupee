@@ -100,7 +100,7 @@ export function useRealtimeSectors() {
   }, [changedSectors]);
 
   useEffect(() => {
-    const url = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    const url = import.meta.env.VITE_API_URL || "/";
     const socket = io(url, { transports: ["websocket"], reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 5000 });
     socketRef.current = socket;
 

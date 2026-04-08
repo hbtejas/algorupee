@@ -26,9 +26,17 @@ export function getApiError(error) {
   if (error?.code === "ECONNABORTED") {
     return "Request timed out. Live provider is slow, please retry.";
   }
-  const message = error?.response?.data?.error || error?.message || "Request failed";
-  if (String(message).toLowerCase().includes("ml engine unavailable")) {
+  const raw = error?.response?.data?.error ?? error?.response?.data?.message ?? error?.message ?? "Request failed";
+  const message = typeof raw === "string" ? raw : JSON.stringify(raw);
+  const lower = String(message).toLowerCase();
+  if (lower.includes("ml engine unavailable")) {
     return "Live AI engine is warming up. Showing fallback data.";
+  }
+  if (lower.includes("backend_api_url is not configured")) {
+    return "Deployment setup incomplete: BACKEND_API_URL is missing in Vercel project settings.";
+  }
+  if (lower.includes("request failed with status code 405")) {
+    return "Method not allowed from deployment route. API proxy/rewrite configuration is not applied yet.";
   }
   return message;
 }

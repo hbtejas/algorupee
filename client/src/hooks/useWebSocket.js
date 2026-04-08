@@ -13,7 +13,7 @@ export function useWebSocket() {
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    const url = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    const url = import.meta.env.VITE_API_URL || "/";
     let socketClient;
 
     try {
