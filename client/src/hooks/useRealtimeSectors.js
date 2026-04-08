@@ -9,7 +9,7 @@ import { analysisApi, getApiError } from "../utils/api";
  * @returns {string}
  */
 function resolveSocketUrl() {
-  const wsUrl = String(import.meta.env.VITE_WS_URL || "").trim();
+  const wsUrl = String(import.meta.env.VITE_WS_URL || "wss://algorupee-backend.onrender.com").trim();
   if (wsUrl) {
     return wsUrl;
   }

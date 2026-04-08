@@ -4,7 +4,7 @@
  */
 
 module.exports = async function handler(req, res) {
-  const backendBase = String(process.env.BACKEND_API_URL || "").trim().replace(/\/$/, "");
+  const backendBase = String(process.env.BACKEND_API_URL || "https://algorupee-backend.onrender.com").trim().replace(/\/$/, "");
 
   if (!backendBase) {
     res.status(500).json({
