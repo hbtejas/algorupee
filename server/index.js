@@ -299,6 +299,23 @@ function configureSocket() {
  * @returns {Promise<void>}
  */
 async function bootstrap() {
+  const port = Number(process.env.PORT || 5000);
+
+  // If same service is already running, treat startup as successful and exit cleanly.
+  try {
+    const resp = await fetch(`http://localhost:${port}/health`, {
+      method: "GET",
+      signal: AbortSignal.timeout(1500),
+    });
+    if (resp.ok) {
+      // eslint-disable-next-line no-console
+      console.log(`Server already running on port ${port}. Reusing existing instance.`);
+      return;
+    }
+  } catch (_) {
+    // Port likely free or service not ready, continue normal startup.
+  }
+
   configureMiddleware();
   configureRoutes();
   configureSocket();
@@ -306,7 +323,6 @@ async function bootstrap() {
   await connectMongo();
   app.locals.redis = await connectRedis();
 
-  const port = Number(process.env.PORT || 5000);
   server.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`Server listening on port ${port}`);
