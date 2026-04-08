@@ -517,92 +517,42 @@ async function fetchNseQuote(symbol) {
  * @param {string[]} symbols
  * @returns {Promise<any[]>}
  */
-async function fetchHeatmapQuotes(symbols) {
+async function fetchHeatmapQuotes(symbols, isSensex = false) {
   try {
-    const chunkSize = 15;
-    const rows = [];
-
-    for (let i = 0; i < symbols.length; i += chunkSize) {
-      const chunk = symbols.slice(i, i + chunkSize);
-      const yahooSymbols = chunk.flatMap((s) => {
-        const sym = String(s || "").toUpperCase();
-        if (!sym) return [];
-        if (sym.includes(".")) return [sym];
-        return [`${sym}.NS`, `${sym}.BO`, sym];
-      });
-      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(yahooSymbols.join(","))}`;
-      const resp = await fetchWithRetry(url, 2);
-      if (!resp) {
-        continue;
-      }
-      const payload = await resp.json();
-      const result = payload?.quoteResponse?.result || [];
-      rows.push(...result);
-    }
-
-    const mapped = rows
-      .map((q) => {
-        const raw = String(q.symbol || "").toUpperCase();
-        const symbol = raw.replace(".NS", "").replace(".BO", "");
-        return {
-          symbol,
-          name: q.shortName || symbol,
-          value: Number(q.regularMarketPrice || 0),
-          change: Number(q.regularMarketChange || 0),
-          changePct: Number(q.regularMarketChangePercent || 0),
-        };
-      })
-      .filter((row) => row.symbol && Number.isFinite(row.value) && row.value > 0);
-
-    const bySymbol = new Map(mapped.map((row) => [String(row.symbol || "").toUpperCase(), row]));
-
-    async function resolveOneSymbol(symbol) {
-      const key = String(symbol || "").toUpperCase();
-      if (!key || bySymbol.has(key)) {
-        return;
-      }
-
-      let quote = await fetchRealtimeQuote(key);
-
-      if (!quote || !Number.isFinite(Number(quote.price))) {
-        return;
-      }
-
-      bySymbol.set(key, {
-        symbol: quote.symbol,
-        name: quote.symbol,
-        value: Number(quote.price || 0),
-        change: Number(quote.change || 0),
-        changePct: Number(quote.changePct || 0),
-      });
-    }
-
-    async function fillMissingWithSingleQuotes() {
-      const pending = symbols.filter((s) => !bySymbol.has(String(s || "").toUpperCase()));
-      const parallel = 3;
-      const deadline = Date.now() + 18000;
-      for (let i = 0; i < pending.length; i += parallel) {
-        if (Date.now() > deadline) {
-          break;
+    const bySymbol = new Map();
+    async function fetchChartFast(baseSymbol) {
+      const key = String(baseSymbol || '').toUpperCase();
+      const isInd = key.includes('.');
+      const suffix = isSensex ? '.BO' : '.NS';
+      const candidate = isInd ? key : key + suffix;
+      try {
+        const url = "https://query1.finance.yahoo.com/v8/finance/chart/" + encodeURIComponent(candidate) + "?interval=1d&range=1d";
+        const resp = await fetchWithRetry(url, 2);
+        if (!resp) return;
+        const payload = await resp.json();
+        const result = payload?.chart?.result?.[0];
+        const meta = result?.meta;
+        if (meta && Number.isFinite(Number(meta.regularMarketPrice))) {
+          const prev = Number(meta.chartPreviousClose || meta.previousClose || 0);
+          const px = Number(meta.regularMarketPrice);
+          bySymbol.set(key, {
+            symbol: key,
+            name: key,
+            value: px,
+            change: px - prev,
+            changePct: prev && px ? ((px - prev) / prev) * 100 : 0,
+          });
         }
-        const group = pending.slice(i, i + parallel);
-        await Promise.all(group.map((symbol) => resolveOneSymbol(symbol)));
-      }
+      } catch (err) {}
     }
-
-    // Fallback: if Yahoo batch is blocked/empty, query per symbol via robust quote resolver.
-    if (!bySymbol.size) {
-      await fillMissingWithSingleQuotes();
-      return Array.from(bySymbol.values());
+    const parallel = 25;
+    for (let i = 0; i < symbols.length; i += parallel) {
+      const group = symbols.slice(i, i + parallel);
+      await Promise.all(group.map((sym) => fetchChartFast(sym)));
+      if (i > 0) await new Promise((r) => setTimeout(r, 400));
     }
-
-    // If batch returned only a small subset, backfill missing symbols sequentially.
-    if (bySymbol.size < Math.ceil(symbols.length * 0.6)) {
-      await fillMissingWithSingleQuotes();
-    }
-
     return Array.from(bySymbol.values());
-  } catch (_) {
+  } catch (error) {
     return [];
   }
 }
@@ -1013,14 +963,14 @@ async function serveMarketHeatmap(req, res) {
     }
 
     let constituents = await Promise.race([
-      fetchHeatmapQuotes(symbols),
+      fetchHeatmapQuotes(symbols, normalizedIndex === "sensex"),
       new Promise((resolve) => setTimeout(() => resolve([]), 15000)),
     ]);
 
     // Recovery pass with a shorter universe for quick partial real-data response.
     if (!constituents.length) {
       const shortlist = symbols.slice(0, 12);
-      constituents = await fetchHeatmapQuotes(shortlist);
+      constituents = await fetchHeatmapQuotes(shortlist, normalizedIndex === "sensex");
     }
 
       const payload = {
