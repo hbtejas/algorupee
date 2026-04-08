@@ -167,10 +167,11 @@ Deploy the React app from `stock-analyzer/client` to Vercel.
 	- Build Command: `npm run build`
 	- Output Directory: `dist`
 4. Add environment variable in Vercel project:
-	- `VITE_API_URL=https://<your-backend-domain>`
+	- `VITE_API_URL=/`
+	- `BACKEND_API_URL=https://<your-backend-domain>`
 5. Deploy.
 
-The `client/vercel.json` file is included to support SPA route rewrites and production headers.
+The root `vercel.json` + `api/[...path].js` proxy setup forwards frontend `/api/*` calls to your backend origin.
 
 Important:
 - The frontend is Vercel-ready.
