@@ -4,6 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 import { io } from "socket.io-client";
 
 /**
+ * Resolve socket server URL for local/dev/prod deployments.
+ * @returns {string}
+ */
+function resolveSocketUrl() {
+  const wsUrl = String(import.meta.env.VITE_WS_URL || "").trim();
+  if (wsUrl) {
+    return wsUrl;
+  }
+
+  const apiUrl = String(import.meta.env.VITE_API_URL || "").trim();
+  if (apiUrl && /^https?:\/\//i.test(apiUrl)) {
+    return apiUrl;
+  }
+
+  return window.location.origin;
+}
+
+/**
  * Connect to backend websocket and track connection state.
  * @returns {{connected: boolean, socketId: string}}
  */
@@ -13,7 +31,7 @@ export function useWebSocket() {
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    const url = import.meta.env.VITE_API_URL || "/";
+    const url = resolveSocketUrl();
     let socketClient;
 
     try {

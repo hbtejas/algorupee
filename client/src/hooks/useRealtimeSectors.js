@@ -5,6 +5,24 @@ import { io } from "socket.io-client";
 import { analysisApi, getApiError } from "../utils/api";
 
 /**
+ * Resolve socket server URL for local/dev/prod deployments.
+ * @returns {string}
+ */
+function resolveSocketUrl() {
+  const wsUrl = String(import.meta.env.VITE_WS_URL || "").trim();
+  if (wsUrl) {
+    return wsUrl;
+  }
+
+  const apiUrl = String(import.meta.env.VITE_API_URL || "").trim();
+  if (apiUrl && /^https?:\/\//i.test(apiUrl)) {
+    return apiUrl;
+  }
+
+  return window.location.origin;
+}
+
+/**
  * Compare old/new sector scores and return changed names.
  * @param {any[]} prev
  * @param {any[]} next
@@ -100,7 +118,7 @@ export function useRealtimeSectors() {
   }, [changedSectors]);
 
   useEffect(() => {
-    const url = import.meta.env.VITE_API_URL || "/";
+    const url = resolveSocketUrl();
     const socket = io(url, { transports: ["websocket"], reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 5000 });
     socketRef.current = socket;
 

@@ -169,6 +169,7 @@ Deploy the React app from `stock-analyzer/client` to Vercel.
 4. Add environment variable in Vercel project:
 	- `VITE_API_URL=/`
 	- `BACKEND_API_URL=https://<your-backend-domain>`
+	- `VITE_WS_URL=https://<your-backend-domain>`
 5. Deploy.
 
 The root `vercel.json` + `api/[...path].js` proxy setup forwards frontend `/api/*` calls to your backend origin.
@@ -176,3 +177,4 @@ The root `vercel.json` + `api/[...path].js` proxy setup forwards frontend `/api/
 Important:
 - The frontend is Vercel-ready.
 - The Node API server and Flask ML engine should run on a backend host (Render/Railway/VM/container) and be referenced via `VITE_API_URL`.
+- Socket.IO realtime features (live channel, sector pushes, score updates) should use `VITE_WS_URL` pointing to the backend origin.
