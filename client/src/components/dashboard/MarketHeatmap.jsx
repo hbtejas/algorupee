@@ -1,7 +1,7 @@
 /** Market heatmap panel for NIFTY 50 and SENSEX constituents. */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { analysisApi } from "../../utils/api";
+import { analysisApi, getApiError } from "../../utils/api";
 
 /**
  * Resolve card color based on percentage change.
@@ -81,7 +81,7 @@ export default function MarketHeatmap({ fullPage = false }) {
         }
       } catch (err) {
         if (active) {
-          const raw = String(err?.response?.data?.error || err?.message || "");
+          const raw = String(getApiError(err) || "");
           const normalized = raw.toLowerCase().includes("route not found") ? "Heatmap API route is not available right now." : raw;
           setError(normalized || "Failed to load heatmap");
         }
