@@ -111,6 +111,10 @@ function configureRoutes() {
     res.status(200).json({ status: "ok", service: "server" });
   });
 
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({ status: "ok", service: "server" });
+  });
+
   app.use("/api/auth", authRoutes);
   app.use("/api/portfolio", portfolioRoutes);
   app.use("/api/alerts", alertsRoutes);
@@ -207,12 +211,14 @@ function configureSocket() {
       });
       if (!resp.ok) return;
       const analysis = await resp.json();
-      io.to(`symbol:${symbol}`).emit("score:update", {
+      const payload = {
         symbol,
         timestamp: new Date().toISOString(),
         recommendation: analysis.recommendation,
         scores: analysis.scores,
-      });
+      };
+      io.to(`symbol:${symbol}`).emit("score:update", payload);
+      io.to(`symbol:${symbol}`).emit(`score:update:${symbol}`, payload);
     } catch (error) {
       return;
     }

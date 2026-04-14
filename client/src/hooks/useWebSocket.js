@@ -41,19 +41,20 @@ export function useWebSocket() {
        * @returns {() => void}
        */
       subscribeScore: (symbol, onUpdate) => {
-        if (!socket || !symbol) {
+        if (!socket || !symbol || typeof onUpdate !== "function") {
           return () => {};
         }
         const normalized = String(symbol).toUpperCase();
+        const eventName = `score:update:${normalized}`;
         socket.emit("subscribe:score", { symbol: normalized });
-        socket.on("score:update", onUpdate);
+        socket.on(eventName, onUpdate);
         return () => {
-          socket.off("score:update", onUpdate);
+          socket.off(eventName, onUpdate);
           socket.emit("unsubscribe:score", { symbol: normalized });
         };
       },
     }),
-    [connected, socketId, socket]
+    [connected, socketId]
   );
 
   return api;

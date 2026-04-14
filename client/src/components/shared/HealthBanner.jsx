@@ -1,8 +1,8 @@
 import React from 'react';
-import { useBackendHealth } from '../../hooks/useBackendHealth';
+import { useHealth } from '../../context/HealthContext';
 
 export default function HealthBanner() {
-  const { online, checking, retry } = useBackendHealth();
+  const { online, checking, retry } = useHealth();
 
   if (online) return null;
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../utils/api';
 
 /**
@@ -8,19 +8,32 @@ import { api } from '../utils/api';
 export function useBackendHealth() {
   const [online, setOnline] = useState(true);
   const [checking, setChecking] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const checkHealth = useCallback(async () => {
-    setChecking(true);
+    if (mountedRef.current) {
+      setChecking(true);
+    }
     try {
-      // 1. On mount, ping GET /api/health
-      await api.get('/health', { timeout: 5000 });
-      // 3. On recovery, set online = true
-      setOnline(true);
+      await api.get('/api/health', { timeout: 5000 });
+      if (mountedRef.current) {
+        setOnline(true);
+      }
     } catch (error) {
-      // 2. On first check failure, set online = false
-      setOnline(false);
+      if (mountedRef.current) {
+        setOnline(false);
+      }
     } finally {
-      setChecking(false);
+      if (mountedRef.current) {
+        setChecking(false);
+      }
     }
   }, []);
 

@@ -49,8 +49,12 @@ Step-by-step for deploying both server/ (Node) and ml-engine/ (Python Flask) to 
 4. Set these required environment variables in Vercel:
    - `VITE_API_URL`: `/`
    - `BACKEND_API_URL`: `https://your-server-name.onrender.com`
+   - `DEFAULT_BACKEND_API_URL`: `https://algorupee-backend.onrender.com` (optional fallback)
    - `VITE_WS_URL`: `https://your-server-name.onrender.com` (Socket.IO uses this)
 5. Deploy. The `vercel.json` in the root will handle proxying and routing.
+
+Health endpoint expected by frontend:
+- `GET /api/health`
 
 ## 4. Daily Zerodha token refresh
 

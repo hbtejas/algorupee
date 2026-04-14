@@ -45,16 +45,32 @@ export default function SearchBar({ onSelect }) {
   }
 
   useEffect(() => {
+    const normalized = query.trim();
+    if (!normalized) {
+      setItems(defaults);
+      return () => {};
+    }
+
+    let active = true;
     const timer = setTimeout(async () => {
       try {
-        const { data } = await analysisApi.search(query.trim());
+        const { data } = await analysisApi.search(normalized);
+        if (!active) {
+          return;
+        }
         setItems(data?.length ? data : defaults);
       } catch (error) {
+        if (!active) {
+          return;
+        }
         setItems(defaults);
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [query]);
 
   return (

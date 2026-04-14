@@ -190,8 +190,12 @@ Deploy from the `stock-analyzer` root directory:
 4. Add these environment variables in Vercel:
 	- `VITE_API_URL=/` (uses same-origin API proxy)
 	- `BACKEND_API_URL=https://<your-backend-domain>` (where your Node server runs)
+	- `DEFAULT_BACKEND_API_URL=https://algorupee-backend.onrender.com` (optional fallback if BACKEND_API_URL is missing)
 	- `VITE_WS_URL=https://<your-backend-domain>` (for WebSocket realtime features)
 5. Deploy.
+
+Health endpoint used by frontend banner:
+- `GET /api/health`
 
 ### Option B: Deploy client only
 

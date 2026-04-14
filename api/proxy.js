@@ -4,8 +4,10 @@
  */
 
 module.exports = async function handler(req, res) {
-  // 1. Read env var BACKEND_API_URL
-  const backendBase = (process.env.BACKEND_API_URL || '').trim().replace(/\/$/, "");
+  // Use configured backend, with safe production fallback for misconfigured deployments.
+  const backendBase = String(process.env.BACKEND_API_URL || process.env.DEFAULT_BACKEND_API_URL || "https://algorupee-backend.onrender.com")
+    .trim()
+    .replace(/\/$/, "");
 
   // CORS Headers
   const corsHeaders = {
@@ -21,10 +23,10 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  // 6. Handle missing BACKEND_API_URL
+  // Handle missing backend target
   if (!backendBase) {
     res.writeHead(503, { "Content-Type": "application/json", ...corsHeaders });
-    res.end(JSON.stringify({ error: "Backend unavailable", code: 503 }));
+    res.end(JSON.stringify({ error: "Backend unavailable", code: 503, hint: "Set BACKEND_API_URL in Vercel project settings" }));
     return;
   }
 
@@ -37,8 +39,8 @@ module.exports = async function handler(req, res) {
     forwardedQuery.delete("path");
 
     const qs = forwardedQuery.toString();
-    // 2. Forward to ${BACKEND_API_URL}/api/${path}
-    const targetUrl = `${backendBase}/api/${normalizedPath}${qs ? `?${qs}` : ""}`;
+    const targetPath = normalizedPath ? `/api/${normalizedPath}` : "/api";
+    const targetUrl = `${backendBase}${targetPath}${qs ? `?${qs}` : ""}`;
 
     // 3. Copy headers except 'host'
     const outgoingHeaders = {};
@@ -81,8 +83,8 @@ module.exports = async function handler(req, res) {
     const arrayBuffer = await upstream.arrayBuffer();
     res.end(Buffer.from(arrayBuffer));
   } catch (error) {
-    // 6. Unreachable backend
+    // Upstream unavailable
     res.writeHead(503, { "Content-Type": "application/json", ...corsHeaders });
-    res.end(JSON.stringify({ error: "Backend unavailable", code: 503 }));
+    res.end(JSON.stringify({ error: "Backend unavailable", code: 503, details: error?.message || "Proxy request failed" }));
   }
 };
