@@ -1,4 +1,6 @@
-# AI-Powered Stock Analysis System (MERN + Flask ML)
+# AlgoInk: AI-Powered Stock Analysis Platform
+
+**Live Deployment:** [https://algoink.vercel.app/](https://algoink.vercel.app/)
 
 Production-ready full-stack stock analysis platform with:
 - React 18 + Vite + Tailwind frontend
