@@ -172,11 +172,28 @@ router.get("/summary", auth, async (req, res) => {
   try {
     const rows = await Portfolio.find({ userId: req.user.id });
 
+    // Fetch live quotes for all symbols concurrently via local API
+    // Fetch live quotes for all symbols concurrently via local proxy
+    const baseUrl = process.env.BACKEND_API_URL || `http://localhost:${process.env.PORT || 5000}`;
+    const prices = await Promise.all(
+      rows.map(async (h) => {
+        try {
+          const resp = await fetch(`${baseUrl}/api/market/quote/${encodeURIComponent(h.symbol)}`);
+          if (resp.ok) {
+            const data = await resp.json();
+            return Number(data.price) || 0;
+          }
+        } catch (_) {}
+        return 0;
+      })
+    );
+
     let totalInvested = 0;
     let totalValue = 0;
-    const holdings = rows.map((h) => {
+    const holdings = rows.map((h, idx) => {
       const invested = Number(h.quantity) * Number(h.buyPrice);
-      const cmp = Number(h.buyPrice);
+      const fetchedPrice = prices[idx];
+      const cmp = fetchedPrice > 0 ? fetchedPrice : Number(h.buyPrice);
       const value = Number(h.quantity) * cmp;
       const pnl = value - invested;
       const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;

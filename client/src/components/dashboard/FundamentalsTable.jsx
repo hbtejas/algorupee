@@ -99,18 +99,22 @@ export default function FundamentalsTable({ fundamentals }) {
             </div>
           </div>
 
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-            <tbody>
-              {tableEntries.map(([k, v]) => (
-                <tr key={k} className="border-b border-white/10">
-                  <td className="py-2 text-white/70">{labelMap[k] || k}</td>
-                  <td className="py-2 text-right font-mono">{formatValue(k, v)}</td>
-                </tr>
-              ))}
-            </tbody>
-            </table>
-          </div>
+          {tableEntries.length === 0 ? (
+            <p className="text-sm text-white/60 py-4 text-center">No fundamental metrics available.</p>
+          ) : (
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <tbody>
+                  {tableEntries.map(([k, v]) => (
+                    <tr key={k} className="border-b border-white/10">
+                      <td className="py-2 text-white/70">{labelMap[k] || k}</td>
+                      <td className="py-2 text-right font-mono">{formatValue(k, v)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

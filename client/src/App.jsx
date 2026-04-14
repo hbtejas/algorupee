@@ -11,6 +11,7 @@ import Alerts from "./pages/Alerts";
 import Heatmap from "./pages/Heatmap";
 import SectorAnalysis from "./pages/SectorAnalysis";
 import Login from "./pages/Login";
+import HealthBanner from "./components/shared/HealthBanner";
 import { useAuth } from "./context/AuthContext";
 
 /**

@@ -52,6 +52,20 @@ export default function Portfolio() {
     );
   }
 
+  if (!loading && (!holdings || holdings.length === 0)) {
+    return (
+      <div className="card flex flex-col items-center justify-center p-12 text-center">
+        <svg className="h-16 w-16 text-white/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        <h2 className="text-xl font-semibold">Your portfolio is empty</h2>
+        <p className="mt-2 text-white/60 text-sm max-w-sm">
+          Go to the Dashboard or search for a stock to add it to your portfolio and track your investments.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {error && <p className="text-sell">{error}</p>}

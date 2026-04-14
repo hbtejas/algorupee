@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { analysisApi, getApiError } from "../../utils/api";
+import { CardSkeleton } from "../shared/Skeleton";
 
 /**
  * Resolve card color based on percentage change.
@@ -167,7 +168,14 @@ export default function MarketHeatmap({ fullPage = false }) {
         </div>
       </div>
 
-      {loading && <p className="text-sm text-white/60">Loading heatmap...</p>}
+      {loading && (
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+      )}
       {!loading && refreshing && <p className="text-xs text-cyan-200/80">Refreshing live board...</p>}
       {error && (
         <div className="mb-3 rounded-lg border border-rose-300/30 bg-rose-500/10 p-3 text-sm text-rose-200">

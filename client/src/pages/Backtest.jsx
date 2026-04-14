@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import SearchBar from "../components/shared/SearchBar";
 import RiskDisclaimer from "../components/shared/RiskDisclaimer";
-import LoadingSpinner from "../components/shared/LoadingSpinner";
+import { ChartSkeleton, TableSkeleton, CardSkeleton } from "../components/shared/Skeleton";
 import { analysisApi, getApiError } from "../utils/api";
 import { formatCurrency } from "../utils/formatters";
 
@@ -108,12 +108,26 @@ export default function Backtest() {
   }
 
   return (
-    <div className="space-y-4">
-      <form onSubmit={run} className="card relative z-40 space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold">Backtest Strategy</h2>
-          <p className="text-sm text-white/60">Pick a stock, strategy, and time window to simulate performance.</p>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* Improved Header Card */}
+      <div className="card relative overflow-hidden border-none bg-gradient-to-br from-surface via-[#0c1423] to-[#0b1d23]">
+        <div className="absolute right-0 top-0 -mt-8 -mr-8 opacity-5 pointer-events-none">
+          <svg className="h-48 w-48 text-primary" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+          </svg>
         </div>
+        <div className="relative z-10">
+          <h2 className="text-2xl font-bold text-white bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
+            Strategy Backtesting
+          </h2>
+          <p className="mt-2 text-sm text-white/60 max-w-xl leading-relaxed">
+            Simulate quantitative trading strategies on historical price data. Evaluate total return, drawdown, and win rates before deploying real capital.
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={run} className="card relative z-40 space-y-5 border-white/5 backdrop-blur-md bg-white/[0.02]">
 
         <SearchBar onSelect={(item) => setForm((s) => ({ ...s, symbol: item.symbol }))} />
 
@@ -123,14 +137,19 @@ export default function Backtest() {
               key={strategy.name}
               type="button"
               onClick={() => setForm((s) => ({ ...s, strategy: strategy.name }))}
-              className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
+              className={`rounded-xl border p-4 text-left transition-all duration-200 group ${
                 form.strategy === strategy.name
-                  ? "border-primary bg-primary/15 text-primary"
-                  : "border-white/15 bg-white/5 text-white/70 hover:border-white/30"
+                  ? "border-primary/50 bg-primary/10 shadow-[0_0_15px_rgba(0,212,170,0.1)]"
+                  : "border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10"
               }`}
             >
-              <p className="font-semibold">{strategy.name}</p>
-              <p className="mt-1 text-xs text-white/60">{strategy.description}</p>
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className={`h-2 w-2 rounded-full ${form.strategy === strategy.name ? 'bg-primary' : 'bg-white/30 group-hover:bg-white/50'}`} />
+                <p className={`font-semibold ${form.strategy === strategy.name ? 'text-primary' : 'text-white/80'}`}>
+                  {strategy.name}
+                </p>
+              </div>
+              <p className="text-xs leading-relaxed text-white/50 pl-4">{strategy.description}</p>
             </button>
           ))}
         </div>
@@ -143,27 +162,27 @@ export default function Backtest() {
           </div>
         )}
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="flex flex-col gap-1 text-xs text-white/70">
-            Symbol
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-white/70 tracking-wide uppercase">
+            Target Symbol
             <input
-              className="rounded border border-white/20 bg-white/5 px-3 py-2 text-sm"
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-mono text-white placeholder:text-white/30 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
               value={form.symbol}
+              placeholder="e.g. RELIANCE"
               onChange={(e) => setForm((s) => ({ ...s, symbol: e.target.value.toUpperCase() }))}
             />
           </label>
-          <div className="rounded border border-white/15 bg-white/5 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-wide text-white/60">Selected Strategy</p>
-            <p className="mt-1 text-sm font-semibold text-primary">{form.strategy}</p>
-            <p className="mt-1 text-xs text-white/60">{selectedStrategy.description}</p>
+          <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 flex flex-col justify-center">
+            <p className="text-[10px] uppercase tracking-wider text-white/50">Active Strategy</p>
+            <p className="mt-0.5 text-sm font-semibold text-primary truncate">{form.strategy}</p>
           </div>
-          <label className="flex flex-col gap-1 text-xs text-white/70">
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-white/70 tracking-wide uppercase">
             Start Date
-            <input type="date" className="rounded border border-white/20 bg-white/5 px-3 py-2 text-sm" value={form.startDate} onChange={(e) => setForm((s) => ({ ...s, startDate: e.target.value }))} />
+            <input type="date" className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary/50 focus:outline-none transition-all" value={form.startDate} onChange={(e) => setForm((s) => ({ ...s, startDate: e.target.value }))} />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-white/70">
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-white/70 tracking-wide uppercase">
             End Date
-            <input type="date" className="rounded border border-white/20 bg-white/5 px-3 py-2 text-sm" value={form.endDate} onChange={(e) => setForm((s) => ({ ...s, endDate: e.target.value }))} />
+            <input type="date" className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-primary/50 focus:outline-none transition-all" value={form.endDate} onChange={(e) => setForm((s) => ({ ...s, endDate: e.target.value }))} />
           </label>
         </div>
 
@@ -181,20 +200,36 @@ export default function Backtest() {
           ))}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex w-full flex-col gap-1 text-xs text-white/70 sm:max-w-[260px]">
-            Initial Capital
-            <input type="number" className="rounded border border-white/20 bg-white/5 px-3 py-2 text-sm" value={form.initialCapital} onChange={(e) => setForm((s) => ({ ...s, initialCapital: Number(e.target.value) }))} />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end border-t border-white/10 pt-5 mt-2">
+          <label className="flex w-full flex-col gap-1.5 text-xs font-medium text-white/70 tracking-wide uppercase sm:max-w-[260px]">
+            Initial Capital (INR)
+            <input type="number" className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-mono text-white focus:border-primary/50 focus:outline-none transition-all" value={form.initialCapital} onChange={(e) => setForm((s) => ({ ...s, initialCapital: Number(e.target.value) }))} />
           </label>
-          <button type="submit" disabled={loading || Boolean(validationError)} className="rounded bg-primary px-4 py-2 font-semibold text-black disabled:cursor-not-allowed disabled:opacity-60 sm:h-[42px]">
-            {loading ? "Running..." : "Run Backtest"}
+          <button type="submit" disabled={loading || Boolean(validationError)} className="rounded-lg bg-primary hover:bg-primary/90 px-6 py-2.5 font-bold text-black shadow-[0_0_15px_rgba(0,212,170,0.3)] transition-all disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none sm:h-[42px] ml-auto">
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </span>
+            ) : "Run Simulation"}
           </button>
         </div>
 
-        {validationError && <p className="text-xs text-amber-300">{validationError}</p>}
+        {validationError && <p className="text-xs text-rose-400 mt-2">{validationError}</p>}
       </form>
 
-      {loading && <LoadingSpinner />}
+      {loading && (
+        <div className="space-y-4 animate-pulse">
+           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+             {[...Array(4)].map((_, i) => <CardSkeleton key={i} />)}
+           </div>
+           <ChartSkeleton />
+           <TableSkeleton rows={4} />
+        </div>
+      )}
       {error && <p className="text-sell">{error}</p>}
 
       {result && (
