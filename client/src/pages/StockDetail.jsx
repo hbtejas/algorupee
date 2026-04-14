@@ -12,6 +12,7 @@ import RecommendationCard from "../components/dashboard/RecommendationCard";
 import ScoreBreakdown from "../components/dashboard/ScoreBreakdown";
 import ExplainabilityPanel from "../components/dashboard/ExplainabilityPanel";
 import FundamentalsTable from "../components/dashboard/FundamentalsTable";
+import SentimentFeed from "../components/dashboard/SentimentFeed";
 import { ChartSkeleton, CardSkeleton } from "../components/shared/Skeleton";
 import RiskDisclaimer from "../components/shared/RiskDisclaimer";
 import { useStockAnalysis } from "../hooks/useStockAnalysis";
