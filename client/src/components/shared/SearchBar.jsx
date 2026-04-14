@@ -92,13 +92,13 @@ export default function SearchBar({ onSelect }) {
         <button
           type="button"
           onClick={submitSearch}
-          disabled={!online}
           title={online ? "" : "Backend offline"}
-          className={`w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-black hover:bg-[#00c19a] sm:w-auto ${!online ? 'cursor-not-allowed opacity-50' : ''}`}
+          className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-black hover:bg-[#00c19a] sm:w-auto"
         >
           Search & Analyze
         </button>
       </div>
+      {!online && <p className="mt-2 text-xs text-amber-300">Live backend is degraded. You can still search symbols and retry analysis.</p>}
       {open && (
         <div className="absolute left-0 right-0 z-50 mt-2 max-h-[60vh] overflow-auto rounded-lg border border-white/10 bg-[#0f1729] shadow-xl">
           {items.map((item) => (

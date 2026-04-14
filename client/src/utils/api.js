@@ -11,20 +11,73 @@ function resolveApiBaseUrl() {
   return (import.meta.env.VITE_API_URL || "/").trim();
 }
 
+/**
+ * Resolve direct backend URL for proxy failover.
+ * Priority: VITE_BACKEND_API_URL -> VITE_WS_URL -> hardcoded fallback.
+ * @returns {string}
+ */
+function resolveDirectBackendUrl() {
+  const fromEnv = String(import.meta.env.VITE_BACKEND_API_URL || import.meta.env.VITE_WS_URL || "").trim();
+  if (fromEnv) {
+    return fromEnv.replace(/\/$/, "");
+  }
+  return "https://algorupee-backend.onrender.com";
+}
+
 const baseURL = resolveApiBaseUrl();
+const directBackendBaseURL = resolveDirectBackendUrl();
+
+/**
+ * Attach auth token to request headers.
+ * @param {any} config
+ * @returns {any}
+ */
+function attachAuthHeader(config) {
+  const next = { ...(config || {}) };
+  next.headers = next.headers || {};
+  const token = localStorage.getItem("token");
+  if (token) {
+    next.headers.Authorization = `Bearer ${token}`;
+  }
+  return next;
+}
 
 export const api = axios.create({
   baseURL,
   timeout: 45000,
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+const directApi = axios.create({
+  baseURL: directBackendBaseURL,
+  timeout: 45000,
 });
+
+api.interceptors.request.use((config) => attachAuthHeader(config));
+directApi.interceptors.request.use((config) => attachAuthHeader(config));
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const status = Number(error?.response?.status || 0);
+    const config = error?.config || {};
+    const url = String(config?.url || "");
+    const alreadyRetried = Boolean(config.__retryViaDirectBackend);
+    const isApiPath = url.startsWith("/api/");
+    const proxyLikelyFailed = [404, 405, 502, 503, 504].includes(status) || status === 0;
+
+    if (!alreadyRetried && isApiPath && proxyLikelyFailed && directBackendBaseURL) {
+      const retryConfig = {
+        ...config,
+        baseURL: directBackendBaseURL,
+        url,
+        __retryViaDirectBackend: true,
+      };
+      return directApi.request(retryConfig);
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 /**
  * Extract API error message safely.

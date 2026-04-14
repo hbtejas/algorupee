@@ -4,8 +4,25 @@
 
 import { io } from "socket.io-client";
 
-// 2. VITE_WS_URL — must default to window.location.origin if not set
-const WS_URL = (import.meta.env.VITE_WS_URL || window.location.origin).trim();
+/**
+ * Resolve websocket endpoint with production fallback.
+ * @returns {string}
+ */
+function resolveWebSocketUrl() {
+  const envUrl = String(import.meta.env.VITE_WS_URL || "").trim();
+  if (envUrl) {
+    return envUrl;
+  }
+
+  const host = String(window.location.host || "").toLowerCase();
+  if (host.endsWith("vercel.app")) {
+    return "https://algorupee-backend.onrender.com";
+  }
+
+  return window.location.origin;
+}
+
+const WS_URL = resolveWebSocketUrl();
 
 // 1. Create socket instance with reconnection options
 export const socket = io(WS_URL, {
