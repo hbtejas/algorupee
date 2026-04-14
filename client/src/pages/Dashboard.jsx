@@ -26,6 +26,8 @@ export default function Dashboard() {
   const [marketOverview, setMarketOverview] = useState([]);
   const [marketUpdatedAt, setMarketUpdatedAt] = useState("");
   const [topSectors, setTopSectors] = useState([]);
+  const [loadingOverview, setLoadingOverview] = useState(true);
+  const [loadingSectors, setLoadingSectors] = useState(true);
 
   const bySymbol = new Map((marketOverview || []).map((item) => [String(item.symbol || "").toUpperCase(), item]));
   const homeIndices = [
@@ -57,7 +59,9 @@ export default function Dashboard() {
         if (Array.isArray(data) && data.length) {
           setMarketUpdatedAt(data[0].updatedAt || new Date().toISOString());
         }
+        setLoadingOverview(false);
       } catch (_) {
+        setLoadingOverview(false);
         return;
       }
     }
