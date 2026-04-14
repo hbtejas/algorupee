@@ -7,21 +7,8 @@ import axios from "axios";
  * @returns {string}
  */
 function resolveApiBaseUrl() {
-  const configured = String(import.meta.env.VITE_API_URL || "").trim();
-  const directBackend = String(import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_WS_URL || "").trim();
-
-  // Use explicit absolute API URL when provided.
-  if (configured && /^https?:\/\//i.test(configured)) {
-    return configured;
-  }
-
-  // If configured to use same-origin proxy but proxy is not deployed, fall back to direct backend URL.
-  if ((configured === "/" || configured === "") && directBackend && /^https?:\/\//i.test(directBackend)) {
-    return directBackend;
-  }
-
-  // Default to same-origin API proxy route.
-  return configured || "/";
+  // 1. VITE_API_URL — must default to '/' if not set
+  return (import.meta.env.VITE_API_URL || "/").trim();
 }
 
 const baseURL = resolveApiBaseUrl();

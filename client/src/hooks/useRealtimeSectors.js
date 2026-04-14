@@ -1,26 +1,6 @@
-/** Real-time sector overview hook with Socket.IO updates and change tracking. */
-
 import { useEffect, useMemo, useRef, useState } from "react";
-import { io } from "socket.io-client";
+import { socket } from "../utils/socket";
 import { analysisApi, getApiError } from "../utils/api";
-
-/**
- * Resolve socket server URL for local/dev/prod deployments.
- * @returns {string}
- */
-function resolveSocketUrl() {
-  const wsUrl = String(import.meta.env.VITE_WS_URL || "wss://algorupee-backend.onrender.com").trim();
-  if (wsUrl) {
-    return wsUrl;
-  }
-
-  const apiUrl = String(import.meta.env.VITE_API_URL || "").trim();
-  if (apiUrl && /^https?:\/\//i.test(apiUrl)) {
-    return apiUrl;
-  }
-
-  return window.location.origin;
-}
 
 /**
  * Compare old/new sector scores and return changed names.
@@ -118,22 +98,10 @@ export function useRealtimeSectors() {
   }, [changedSectors]);
 
   useEffect(() => {
-    const url = resolveSocketUrl();
-    const socket = io(url, { transports: ["websocket"], reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 5000 });
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      setReconnecting(false);
-    });
-
-    socket.on("disconnect", () => {
-      setReconnecting(true);
-    });
-
-    socket.on("sector_update", (payload) => {
-      if (!payload || !autoRefreshRef.current) {
-        return;
-      }
+    const onConnect = () => setReconnecting(false);
+    const onDisconnect = () => setReconnecting(true);
+    const onUpdate = (payload) => {
+      if (!payload || !autoRefreshRef.current) return;
       const next = Array.isArray(payload.sectors) ? payload.sectors : [];
       setChangedSectors((prev) => {
         const merged = new Set([...prev, ...diffChangedSectors(sectorsRef.current, next)]);
@@ -144,11 +112,19 @@ export function useRealtimeSectors() {
       setIsMarketOpen(Boolean(payload.market_open));
       setLastUpdated(payload.last_updated || payload.timestamp || new Date().toISOString());
       setError("");
-    });
+    };
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("sector_update", onUpdate);
+
+    // Initial state
+    if (!socket.connected) setReconnecting(true);
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("sector_update", onUpdate);
     };
   }, []);
 

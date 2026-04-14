@@ -1,56 +1,32 @@
-/** Hook for WebSocket connection status from server Socket.IO endpoint. */
-
 import { useEffect, useMemo, useState } from "react";
-import { io } from "socket.io-client";
-
-/**
- * Resolve socket server URL for local/dev/prod deployments.
- * @returns {string}
- */
-function resolveSocketUrl() {
-  const wsUrl = String(import.meta.env.VITE_WS_URL || "wss://algorupee-backend.onrender.com").trim();
-  if (wsUrl) {
-    return wsUrl;
-  }
-
-  const apiUrl = String(import.meta.env.VITE_API_URL || "").trim();
-  if (apiUrl && /^https?:\/\//i.test(apiUrl)) {
-    return apiUrl;
-  }
-
-  return window.location.origin;
-}
+import { socket } from "../utils/socket";
 
 /**
  * Connect to backend websocket and track connection state.
  * @returns {{connected: boolean, socketId: string}}
  */
 export function useWebSocket() {
-  const [connected, setConnected] = useState(false);
-  const [socketId, setSocketId] = useState("");
-  const [socket, setSocket] = useState(null);
+  const [connected, setConnected] = useState(socket.connected);
+  const [socketId, setSocketId] = useState(socket.id || "");
 
   useEffect(() => {
-    const url = resolveSocketUrl();
-    let socketClient;
-
-    try {
-      socketClient = io(url, { transports: ["websocket"] });
-      socketClient.on("connect", () => {
-        setConnected(true);
-        setSocketId(socketClient.id || "");
-      });
-      socketClient.on("disconnect", () => {
-        setConnected(false);
-      });
-      setSocket(socketClient);
-    } catch (error) {
+    const onConnect = () => {
+      setConnected(true);
+      setSocketId(socket.id || "");
+    };
+    const onDisconnect = () => {
       setConnected(false);
-    }
+    };
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+
+    // Initial state
+    if (socket.connected) onConnect();
 
     return () => {
-      if (socketClient) socketClient.disconnect();
-      setSocket(null);
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
     };
   }, []);
 

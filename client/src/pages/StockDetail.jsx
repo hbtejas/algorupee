@@ -12,12 +12,12 @@ import RecommendationCard from "../components/dashboard/RecommendationCard";
 import ScoreBreakdown from "../components/dashboard/ScoreBreakdown";
 import ExplainabilityPanel from "../components/dashboard/ExplainabilityPanel";
 import FundamentalsTable from "../components/dashboard/FundamentalsTable";
-import SentimentFeed from "../components/dashboard/SentimentFeed";
-import LoadingSpinner from "../components/shared/LoadingSpinner";
+import { ChartSkeleton, CardSkeleton } from "../components/shared/Skeleton";
 import RiskDisclaimer from "../components/shared/RiskDisclaimer";
 import { useStockAnalysis } from "../hooks/useStockAnalysis";
 import { useWebSocket } from "../hooks/useWebSocket";
-import { analysisApi } from "../utils/api";
+import { useHealth } from "../context/HealthContext";
+import { analysisApi, portfolioApi, alertsApi } from "../utils/api";
 import { formatCurrency, formatPercent } from "../utils/formatters";
 
 /**
@@ -26,6 +26,7 @@ import { formatCurrency, formatPercent } from "../utils/formatters";
  */
 export default function StockDetail() {
   const { symbol } = useParams();
+  const { online } = useHealth();
   const { analyze, loading, error } = useStockAnalysis();
   const { connected, subscribeScore } = useWebSocket();
   const [analysis, setAnalysis] = useState(null);
@@ -138,16 +139,59 @@ export default function StockDetail() {
     };
   }, [symbol]);
 
-  if (loading) return <LoadingSpinner />;
-  if (error) return <p className="text-sell">{error}</p>;
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="card h-24 flex items-center gap-4">
+           <CardSkeleton />
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[2fr,1fr]">
+          <div className="space-y-4">
+            <ChartSkeleton />
+            <ChartSkeleton />
+          </div>
+          <div className="space-y-4">
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (error) return (
+    <div className="card border-sell/50 bg-sell/5 p-6 text-center">
+      <p className="text-sell">{error}</p>
+      <button onClick={() => window.location.reload()} className="mt-4 rounded bg-primary px-4 py-2 text-sm font-semibold text-black">Retry</button>
+    </div>
+  );
   if (!analysis) return <p className="text-white/70">No analysis data available.</p>;
 
   return (
     <div className="space-y-4">
       <div className="card flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="font-mono text-lg text-primary">{analysis.symbol}</p>
-          <p className="text-sm text-white/70">{analysis.company_name}</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <p className="font-mono text-lg text-primary">{analysis.symbol}</p>
+            <p className="text-sm text-white/70">{analysis.company_name}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => portfolioApi.add({ symbol, price: analysis.current_price, quantity: 1 })}
+              disabled={!online}
+              title={online ? "" : "Backend offline"}
+              className={`rounded border border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary hover:bg-primary/20 ${!online ? 'cursor-not-allowed opacity-50' : ''}`}
+            >
+              + Portfolio
+            </button>
+            <button
+              onClick={() => alertsApi.create({ symbol, type: 'PRICE_ABOVE', threshold: analysis.current_price * 1.05 })}
+              disabled={!online}
+              title={online ? "" : "Backend offline"}
+              className={`rounded border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 hover:bg-white/10 ${!online ? 'cursor-not-allowed opacity-50' : ''}`}
+            >
+              Set Alert
+            </button>
+          </div>
         </div>
         <div className="text-right">
           <p className="font-mono text-2xl">{formatCurrency(analysis.current_price)}</p>

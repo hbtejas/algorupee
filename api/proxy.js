@@ -1,16 +1,30 @@
 /**
  * Vercel serverless proxy for frontend /api requests.
- * Requires BACKEND_API_URL env var (e.g. https://your-backend.example.com).
+ * Forwards requests to the backend service defined in BACKEND_API_URL.
  */
 
 module.exports = async function handler(req, res) {
-  const backendBase = String(process.env.BACKEND_API_URL || "https://algorupee-backend.onrender.com").trim().replace(/\/$/, "");
+  // 1. Read env var BACKEND_API_URL
+  const backendBase = (process.env.BACKEND_API_URL || '').trim().replace(/\/$/, "");
 
+  // CORS Headers
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  };
+
+  // 8. Handle OPTIONS preflight
+  if (req.method === "OPTIONS") {
+    res.writeHead(200, corsHeaders);
+    res.end();
+    return;
+  }
+
+  // 6. Handle missing BACKEND_API_URL
   if (!backendBase) {
-    res.status(500).json({
-      error: "BACKEND_API_URL is not configured on Vercel",
-      hint: "Set BACKEND_API_URL to your deployed backend origin",
-    });
+    res.writeHead(503, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify({ error: "Backend unavailable", code: 503 }));
     return;
   }
 
@@ -23,57 +37,52 @@ module.exports = async function handler(req, res) {
     forwardedQuery.delete("path");
 
     const qs = forwardedQuery.toString();
-    const targetPath = normalizedPath ? `/api/${normalizedPath}` : "/api";
-    const targetUrl = `${backendBase}${targetPath}${qs ? `?${qs}` : ""}`;
+    // 2. Forward to ${BACKEND_API_URL}/api/${path}
+    const targetUrl = `${backendBase}/api/${normalizedPath}${qs ? `?${qs}` : ""}`;
 
+    // 3. Copy headers except 'host'
     const outgoingHeaders = {};
     for (const [key, value] of Object.entries(req.headers || {})) {
-      const lower = String(key || "").toLowerCase();
-      if (lower === "host" || lower === "content-length" || lower === "connection") {
-        continue;
-      }
-      if (typeof value === "string") {
+      if (key.toLowerCase() !== "host") {
         outgoingHeaders[key] = value;
       }
     }
 
-    if (req.method === "OPTIONS") {
-      res.status(204).end();
-      return;
-    }
-
-    const bodyAllowed = !["GET", "HEAD"].includes(String(req.method || "GET").toUpperCase());
-    let bodyBuffer;
-
+    // 4. Forward body for POST/PUT/PATCH
+    const bodyAllowed = ["POST", "PUT", "PATCH"].includes(req.method.toUpperCase());
+    let body;
     if (bodyAllowed) {
       const chunks = [];
       for await (const chunk of req) {
         chunks.push(chunk);
       }
-      bodyBuffer = chunks.length ? Buffer.concat(chunks) : undefined;
+      body = Buffer.concat(chunks);
     }
 
+    // 5. Use native Node 18 fetch
     const upstream = await fetch(targetUrl, {
       method: req.method,
       headers: outgoingHeaders,
-      body: bodyBuffer,
+      body: body,
+      redirect: "manual",
     });
 
-    res.status(upstream.status);
+    // 5. Stream backend response back
+    const responseHeaders = { ...corsHeaders };
     upstream.headers.forEach((value, key) => {
-      const lower = String(key || "").toLowerCase();
-      if (lower === "transfer-encoding" || lower === "content-encoding") {
-        return;
+      const k = key.toLowerCase();
+      // Skip potentially problematic headers for proxying
+      if (k !== "transfer-encoding" && k !== "content-encoding" && k !== "access-control-allow-origin") {
+        responseHeaders[key] = value;
       }
-      res.setHeader(key, value);
     });
 
+    res.writeHead(upstream.status, responseHeaders);
     const arrayBuffer = await upstream.arrayBuffer();
-    res.send(Buffer.from(arrayBuffer));
+    res.end(Buffer.from(arrayBuffer));
   } catch (error) {
-    res.status(502).json({
-      error: "Proxy request failed",
-      details: error?.message || "Unknown proxy error",
-    });
+    // 6. Unreachable backend
+    res.writeHead(503, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify({ error: "Backend unavailable", code: 503 }));
   }
 };

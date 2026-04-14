@@ -4,16 +4,12 @@ import { useEffect } from "react";
 import { useState } from "react";
 import PortfolioChart from "../components/portfolio/PortfolioChart";
 import PortfolioTable from "../components/portfolio/PortfolioTable";
-import LoadingSpinner from "../components/shared/LoadingSpinner";
+import { ChartSkeleton, TableSkeleton, CardSkeleton } from "../components/shared/Skeleton";
 import { usePortfolioContext } from "../context/PortfolioContext";
 import { usePortfolio } from "../hooks/usePortfolio";
 import { portfolioApi, getApiError } from "../utils/api";
 import { formatCurrency, formatPercent } from "../utils/formatters";
 
-/**
- * Portfolio route component.
- * @returns {JSX.Element}
- */
 export default function Portfolio() {
   const { summary, holdings, loading, error } = usePortfolioContext();
   const { removeHolding, refresh } = usePortfolio();
@@ -40,7 +36,21 @@ export default function Portfolio() {
     }
   }
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <TableSkeleton rows={8} />
+          <ChartSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

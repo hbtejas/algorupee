@@ -6,7 +6,7 @@ import os
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -21,8 +21,13 @@ load_dotenv()
 
 try:
     from kiteconnect import KiteConnect
+    from token_manager import get_kite_client
 except Exception:  # pragma: no cover
     KiteConnect = None
+    get_kite_client = None
+
+
+_news_cache = {}  # ISSUE 6: Global news cache key: symbol, value: { 'data': [...], 'ts': datetime }
 
 
 @dataclass
@@ -70,16 +75,12 @@ class ZerodhaAdapter:
     """Adapter for Zerodha Kite historical/live market data."""
 
     def __init__(self):
-        self.api_key = os.getenv("ZERODHA_API_KEY")
-        self.access_token = os.getenv("ZERODHA_ACCESS_TOKEN")
         self.client = None
-
-        try:
-            if self.api_key and self.access_token and KiteConnect:
-                self.client = KiteConnect(api_key=self.api_key)
-                self.client.set_access_token(self.access_token)
-        except Exception:
-            self.client = None
+        if get_kite_client:
+            try:
+                self.client = get_kite_client()
+            except Exception:
+                self.client = None
 
     @property
     def configured(self) -> bool:
@@ -114,7 +115,10 @@ class ZerodhaAdapter:
             df.set_index("Date", inplace=True)
             return df[["Open", "High", "Low", "Close", "Volume"]]
         except Exception as exc:
-            raise RuntimeError(f"Zerodha historical fetch failed: {exc}") from exc
+            # ISSUE 5.5: Fallback logic for token expiry
+            if "TokenException" in str(exc) or "403" in str(exc):
+                print("Zerodha token expired. Visit /zerodha/login to refresh.")
+            return pd.DataFrame() # Fall back to empty and let caller handle yfinance
 
     def get_live_quote(self, symbol: str) -> Dict[str, Any]:
         """Fetch live quote using Zerodha quote endpoint."""
@@ -217,13 +221,41 @@ class YFinanceAdapter:
                 continue
         return {}
 
+    def __init__(self):
+        self._session = requests.Session()
+        self._session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        self._crumb = None
+        self._cookie_fetched = False
+
+    def _get_crumb(self) -> str:
+        """Fetch and cache Yahoo Finance crumb."""
+        if self._crumb:
+            return self._crumb
+        if not self._cookie_fetched:
+            try:
+                self._session.get("https://fc.yahoo.com/", timeout=5)
+                self._cookie_fetched = True
+            except Exception:
+                pass
+        try:
+            resp = self._session.get("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=5)
+            if resp.ok:
+                self._crumb = resp.text.strip()
+        except Exception:
+            pass
+        return self._crumb or ""
+
     def _fetch_quote_summary(self, symbol: str) -> Dict[str, Any]:
         """Fetch quote summary modules for ownership/fundamentals fallback."""
+        crumb = self._get_crumb()
         for candidate in self._quote_candidates(symbol):
             try:
-                resp = requests.get(
+                params = {"modules": "defaultKeyStatistics,summaryProfile,financialData,summaryDetail"}
+                if crumb:
+                    params["crumb"] = crumb
+                resp = self._session.get(
                     f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{candidate}",
-                    params={"modules": "defaultKeyStatistics,summaryProfile,financialData"},
+                    params=params,
                     timeout=7,
                 )
                 resp.raise_for_status()
@@ -336,11 +368,19 @@ class YFinanceAdapter:
             summary_profile = quote_summary.get("summaryProfile") or {}
             financial_data = quote_summary.get("financialData") or {}
 
+            summary_detail = quote_summary.get("summaryDetail") or {}
+
             def pick(*values: Any, default: Any = None) -> Any:
                 for item in values:
                     if item is not None and item != "":
                         return item
                 return default
+
+            def q_raw(obj: Dict[str, Any], key: str) -> Any:
+                try:
+                    return obj.get(key, {}).get("raw")
+                except Exception:
+                    return None
 
             current_price = pick(
                 val("currentPrice"),
@@ -363,8 +403,8 @@ class YFinanceAdapter:
                 except Exception:
                     current_price = 0.0
 
-            highs = pick(val("fiftyTwoWeekHigh"), quote_snapshot.get("fiftyTwoWeekHigh"))
-            lows = pick(val("fiftyTwoWeekLow"), quote_snapshot.get("fiftyTwoWeekLow"))
+            highs = pick(val("fiftyTwoWeekHigh"), quote_snapshot.get("fiftyTwoWeekHigh"), q_raw(summary_detail, "fiftyTwoWeekHigh"))
+            lows = pick(val("fiftyTwoWeekLow"), quote_snapshot.get("fiftyTwoWeekLow"), q_raw(summary_detail, "fiftyTwoWeekLow"))
 
             promoter_holding = None
             institutional_holding = None
@@ -426,30 +466,30 @@ class YFinanceAdapter:
                 business_model = f"{company_name} operates in the {industry} segment under the {sector} sector."
 
             return {
-                "pe_ratio": pick(val("trailingPE"), quote_snapshot.get("trailingPE")),
-                "forward_pe": pick(val("forwardPE"), quote_snapshot.get("forwardPE")),
-                "pb_ratio": pick(val("priceToBook"), quote_snapshot.get("priceToBook")),
-                "roe": val("returnOnEquity"),
-                "roa": val("returnOnAssets"),
+                "pe_ratio": pick(val("trailingPE"), quote_snapshot.get("trailingPE"), q_raw(summary_detail, "trailingPE")),
+                "forward_pe": pick(val("forwardPE"), quote_snapshot.get("forwardPE"), q_raw(key_stats, "forwardPE"), q_raw(summary_detail, "forwardPE")),
+                "pb_ratio": pick(val("priceToBook"), quote_snapshot.get("priceToBook"), q_raw(key_stats, "priceToBook")),
+                "roe": pick(val("returnOnEquity"), q_raw(financial_data, "returnOnEquity")),
+                "roa": pick(val("returnOnAssets"), q_raw(financial_data, "returnOnAssets")),
                 "debt_to_equity": val("debtToEquity", 0) / 100 if val("debtToEquity") is not None else pct_value((financial_data.get("debtToEquity") or {}).get("raw")),
-                "current_ratio": pick(val("currentRatio"), (financial_data.get("currentRatio") or {}).get("raw")),
-                "revenue_growth": val("revenueGrowth"),
-                "earnings_growth": val("earningsGrowth"),
-                "profit_margin": val("profitMargins"),
-                "market_cap": pick(val("marketCap"), quote_snapshot.get("marketCap")),
-                "dividend_yield": pick(val("dividendYield"), quote_snapshot.get("trailingAnnualDividendYield")),
+                "current_ratio": pick(val("currentRatio"), q_raw(financial_data, "currentRatio")),
+                "revenue_growth": pick(val("revenueGrowth"), q_raw(financial_data, "revenueGrowth")),
+                "earnings_growth": pick(val("earningsGrowth"), q_raw(financial_data, "earningsGrowth")),
+                "profit_margin": pick(val("profitMargins"), q_raw(financial_data, "profitMargins")),
+                "market_cap": pick(val("marketCap"), quote_snapshot.get("marketCap"), q_raw(summary_detail, "marketCap")),
+                "dividend_yield": pick(val("dividendYield"), quote_snapshot.get("trailingAnnualDividendYield"), q_raw(summary_detail, "dividendYield")),
                 "52w_high": highs,
                 "52w_low": lows,
-                "beta": pick(val("beta"), quote_snapshot.get("beta")),
+                "beta": pick(val("beta"), quote_snapshot.get("beta"), q_raw(key_stats, "beta"), q_raw(summary_detail, "beta")),
                 "sector": sector,
                 "industry": industry,
                 "company_name": company_name,
                 "current_price": float(current_price or 0.0),
-                "currency": val("currency", "INR"),
+                "currency": val("currency") or "INR",
                 "business_model": business_model,
                 "promoter_holding_pct": promoter_holding,
                 "institutional_holding_pct": institutional_holding,
-                "website": pick(val("website"), quote_snapshot.get("website"), f"https://finance.yahoo.com/quote/{self._normalize_symbol(self._base_symbol(symbol))}"),
+                "website": pick(val("website"), quote_snapshot.get("website"), summary_profile.get("website"), f"https://finance.yahoo.com/quote/{self._normalize_symbol(self._base_symbol(symbol))}"),
             }
         except Exception as exc:
             return self._default_fundamentals(symbol=symbol)
@@ -476,8 +516,13 @@ class NewsFetcher:
                     "pageSize": limit,
                     "apiKey": self.news_api_key,
                 },
-                timeout=10,
+                timeout=5, # ISSUE 6.4: 5 second timeout
             )
+            # ISSUE 6.2: Fallback on specific status codes
+            if resp.status_code in [426, 401, 403]:
+                print(f"NewsAPI unavailable (Status {resp.status_code}), using RSS fallback")
+                return []
+                
             resp.raise_for_status()
             payload = resp.json()
             articles = payload.get("articles", [])
@@ -491,7 +536,8 @@ class NewsFetcher:
                 }
                 for a in articles
             ]
-        except Exception:
+        except Exception as e:
+            print(f"NewsAPI request failed: {e}, using RSS fallback")
             return []
 
     def _from_google_rss(self, query: str, limit: int) -> List[Dict[str, Any]]:
@@ -561,7 +607,14 @@ class NewsFetcher:
         return f"{s}.NS"
 
     def fetch_news(self, symbol: str, company_name: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """Fetch and deduplicate stock news."""
+        """Fetch and deduplicate stock news with 5-min caching."""
+        # ISSUE 6.3: Check cache before making any HTTP call
+        cache_key = symbol.upper()
+        if cache_key in _news_cache:
+            entry = _news_cache[cache_key]
+            if datetime.now() - entry['ts'] < timedelta(minutes=5):
+                return entry['data']
+
         query = f"{company_name} OR {symbol} stock India"
         articles = self._from_newsapi(query=query, limit=limit)
         if not articles:
@@ -576,7 +629,11 @@ class NewsFetcher:
             if key and key not in seen:
                 deduped.append(article)
                 seen.add(key)
-        return deduped[:limit]
+        
+        # ISSUE 6.3: Store successful results in cache
+        res = deduped[:limit]
+        _news_cache[cache_key] = {'data': res, 'ts': datetime.now()}
+        return res
 
 
 class DataManager:

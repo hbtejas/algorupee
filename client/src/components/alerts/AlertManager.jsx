@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { alertsApi, getApiError } from "../../utils/api";
-import LoadingSpinner from "../shared/LoadingSpinner";
+import { TableSkeleton } from "../shared/Skeleton";
+import { useHealth } from "../../context/HealthContext";
 
 const types = ["PRICE_ABOVE", "PRICE_BELOW", "SCORE_BUY", "SCORE_SELL"];
 
@@ -11,6 +12,7 @@ const types = ["PRICE_ABOVE", "PRICE_BELOW", "SCORE_BUY", "SCORE_SELL"];
  * @returns {JSX.Element}
  */
 export default function AlertManager() {
+  const { online } = useHealth();
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -61,7 +63,7 @@ export default function AlertManager() {
     }
   }
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return <div className="card"><TableSkeleton rows={5} /></div>;
 
   return (
     <div className="space-y-4">
@@ -91,7 +93,12 @@ export default function AlertManager() {
           className="rounded border border-white/20 bg-white/5 px-3 py-2"
           required
         />
-        <button type="submit" className="rounded bg-primary px-3 py-2 font-semibold text-black">
+        <button 
+          type="submit" 
+          disabled={!online}
+          title={online ? "" : "Backend offline"}
+          className={`rounded bg-primary px-3 py-2 font-semibold text-black ${!online ? 'cursor-not-allowed opacity-50' : ''}`}
+        >
           Create Alert
         </button>
       </form>

@@ -72,9 +72,31 @@ async function connectRedis() {
  */
 function configureMiddleware() {
   app.use(helmet());
-  app.use(cors());
+  
+  // 1-2. CORS Configuration
+  const defaultOrigins = [
+    "https://algoink.vercel.app",
+    "https://algorupee.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173"
+  ];
+  const envOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);
+  const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
+
+  app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true, // 3. Set credentials: true
+    exposedHeaders: ["Authorization"], // 4. Expose Authorization header
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"] // 5. Allow specific headers
+  }));
+
   app.use(require('compression')());
-  app.use(require('helmet')());
   app.use(express.json({ limit: "1mb" }));
   app.use(morgan("dev"));
   app.use(createApiRateLimiter());

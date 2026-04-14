@@ -8,6 +8,7 @@ import SectorRotationChart from "../components/sector/SectorRotationChart";
 import TopStocksTable from "../components/sector/TopStocksTable";
 import { useRealtimeSectors } from "../hooks/useRealtimeSectors";
 import { useRealtimeStocks } from "../hooks/useRealtimeStocks";
+import { CardSkeleton, ChartSkeleton } from "../components/shared/Skeleton";
 import { analysisApi, getApiError } from "../utils/api";
 
 /**
@@ -241,30 +242,41 @@ export default function SectorAnalysis() {
         </select>
       </div>
 
-      {visibleError && <p className="text-sm text-sell">{visibleError}</p>}
-      {loading && <p className="text-sm text-white/70">Loading sector data...</p>}
+      {visibleError && <p className="text-sm text-sell mt-4">{visibleError}</p>}
 
-      {view === "overview" && (
+      {loading ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {[...Array(6)].map((_, i) => <CardSkeleton key={i} />)}
+        </div>
+      ) : (
         <>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {sortedSectors.map((sector) => (
-              <SectorCard
-                key={sector?.sector_name}
-                sector={sector}
-                changed={changedSectors.includes(sector?.sector_name)}
-                onOpen={() => openSectorDetails(sector?.sector_name)}
-                onOpenPage={() => openSectorPage(sector?.sector_name)}
-              />
-            ))}
-          </div>
+          {view === "overview" && (
+            <>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {sortedSectors.map((sector) => (
+                  <SectorCard
+                    key={sector?.sector_name}
+                    sector={sector}
+                    changed={changedSectors.includes(sector?.sector_name)}
+                    onOpen={() => openSectorDetails(sector?.sector_name)}
+                    onOpenPage={() => openSectorPage(sector?.sector_name)}
+                  />
+                ))}
+              </div>
 
-          <div ref={detailRef} className="grid gap-4 xl:grid-cols-[1.3fr,1fr]">
-            <div className="space-y-4">
-              <SectorRotationChart data={rotationData} />
-              <TopStocksTable stocks={stocks} loading={stocksLoading} title={`Top Stocks - ${selectedSectorData?.sector_name || "Sector"}`} />
-            </div>
-            <SectorDetailPanel sector={selectedSectorData} />
-          </div>
+              <div ref={detailRef} className="grid gap-4 xl:grid-cols-[1.3fr,1fr]">
+                <div className="space-y-4">
+                  <SectorRotationChart data={rotationData} />
+                  <TopStocksTable
+                    stocks={stocks}
+                    loading={stocksLoading}
+                    title={`Top Stocks - ${selectedSectorData?.sector_name || "Sector"}`}
+                  />
+                </div>
+                <SectorDetailPanel sector={selectedSectorData} />
+              </div>
+            </>
+          )}
         </>
       )}
 

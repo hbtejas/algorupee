@@ -9,7 +9,7 @@
       "destination": "/api/proxy?path=$1"
     },
     {
-      "source": "/((?!api|assets|favicon.ico|vite.svg).*)",
+      "source": "/((?!api|assets|favicon\\.ico|vite\\.svg).*)",
       "destination": "/index.html"
     }
   ]

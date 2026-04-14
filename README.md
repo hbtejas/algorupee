@@ -12,6 +12,7 @@ Production-ready full-stack stock analysis platform with:
 - client: React app
 - server: Express API gateway
 - ml-engine: Flask ML analysis engine
+- api: Vercel serverless proxy functions
 
 ## 2. Setup Prerequisites
 
@@ -124,6 +125,7 @@ Services:
 - POST /api/portfolio/add
 - DELETE /api/portfolio/:id
 - GET /api/portfolio/summary
+- GET /api/portfolio/optimize
 
 ### Alerts (protected)
 - GET /api/alerts
@@ -135,6 +137,21 @@ Services:
 - GET /api/analysis/price-history/:symbol?period=1y
 - GET /api/analysis/search?q=infosys
 - POST /api/backtest/run
+
+### Market Data
+- GET /api/market/overview
+- GET /api/market/quote/:symbol
+- GET /api/market/heatmap?index=nifty50
+
+### Sector Analysis
+- GET /api/sector/overview
+- GET /api/sector/rotation
+- GET /api/sector/heatmap
+- GET /api/sector/compare?sectors=IT,Banking
+- GET /api/sector/lookup/:symbol
+- GET /api/sector/:sectorName
+- GET /api/sector/:sectorName/top-stocks
+- POST /api/sector/refresh
 
 ## 7. Zerodha API Key Setup
 
@@ -156,27 +173,45 @@ Services:
 - JWT is required for portfolio and alerts routes.
 - Redis caches analysis and price history responses for 5 minutes.
 
-## 10. Vercel Deployment (Frontend)
+## 10. Vercel Deployment (Frontend + API Proxy)
 
-Deploy the React app from `stock-analyzer/client` to Vercel.
+Deploy from the `stock-analyzer` root directory:
+
+### Option A: Deploy from project root (Recommended)
 
 1. Push this repository to GitHub.
-2. In Vercel, create a new project and set the Root Directory to `stock-analyzer/client`.
-3. Build settings:
-	- Framework Preset: `Vite`
-	- Build Command: `npm run build`
-	- Output Directory: `dist`
-4. Add environment variable in Vercel project:
-	- `VITE_API_URL=/`
-	- `VITE_BACKEND_URL=https://<your-backend-domain>`
-	- `BACKEND_API_URL=https://<your-backend-domain>`
-	- `VITE_WS_URL=https://<your-backend-domain>`
+2. In Vercel, create a new project and set the **Root Directory** to `stock-analyzer`.
+3. Build settings are auto-configured via `vercel.json`:
+	- Install: `npm --prefix client install`
+	- Build: `npm --prefix client run build`
+	- Output: `client/dist`
+4. Add these environment variables in Vercel:
+	- `VITE_API_URL=/` (uses same-origin API proxy)
+	- `BACKEND_API_URL=https://<your-backend-domain>` (where your Node server runs)
+	- `VITE_WS_URL=https://<your-backend-domain>` (for WebSocket realtime features)
 5. Deploy.
 
-The root `vercel.json` + `api/[...path].js` proxy setup forwards frontend `/api/*` calls to your backend origin.
+### Option B: Deploy client only
 
-Important:
-- The frontend is Vercel-ready.
-- The Node API server and Flask ML engine should run on a backend host (Render/Railway/VM/container) and be referenced via `VITE_API_URL`.
-- Socket.IO realtime features (live channel, sector pushes, score updates) should use `VITE_WS_URL` pointing to the backend origin.
-- If Vercel API functions are not mounted in your project, set `VITE_API_URL=/` and `VITE_BACKEND_URL` to the backend origin so API calls work directly.
+1. Set Root Directory to `stock-analyzer/client`.
+2. Framework Preset: `Vite`
+3. Build Command: `npm run build`
+4. Output Directory: `dist`
+5. Add environment variables:
+	- `VITE_API_URL=/`
+	- `BACKEND_API_URL=https://<your-backend-domain>`
+	- `VITE_WS_URL=https://<your-backend-domain>`
+
+### How the API Proxy Works
+
+The `api/proxy.js` Vercel serverless function forwards all `/api/*` requests to your backend. The `vercel.json` rewrites route `/api/(.*)` to `/api/proxy?path=$1`.
+
+### Backend Deployment
+
+The Node API server and Flask ML engine should run on:
+- **Render** (recommended free tier)
+- **Railway**
+- **DigitalOcean App Platform**
+- **AWS EC2 / GCP Compute**
+
+Set `BACKEND_API_URL` in Vercel to your backend's public URL.

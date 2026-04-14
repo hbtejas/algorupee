@@ -1,20 +1,8 @@
-/** Debounced stock symbol search bar with default Indian stock suggestions. */
-
 import { useEffect, useState } from "react";
 import { analysisApi } from "../../utils/api";
+import { useHealth } from "../../context/HealthContext";
 
-const defaults = [
-  { symbol: "RELIANCE", name: "Reliance Industries", exchange: "NSE", current_price: 0 },
-  { symbol: "TCS", name: "Tata Consultancy Services", exchange: "NSE", current_price: 0 },
-  { symbol: "INFY", name: "Infosys Limited", exchange: "NSE", current_price: 0 },
-  { symbol: "HDFCBANK", name: "HDFC Bank", exchange: "NSE", current_price: 0 },
-  { symbol: "ICICIBANK", name: "ICICI Bank", exchange: "NSE", current_price: 0 },
-  { symbol: "WIPRO", name: "Wipro", exchange: "NSE", current_price: 0 },
-  { symbol: "LT", name: "Larsen & Toubro", exchange: "NSE", current_price: 0 },
-  { symbol: "ASIANPAINT", name: "Asian Paints", exchange: "NSE", current_price: 0 },
-  { symbol: "BAJFINANCE", name: "Bajaj Finance", exchange: "NSE", current_price: 0 },
-  { symbol: "SBIN", name: "State Bank of India", exchange: "NSE", current_price: 0 },
-];
+// ... (defaults)
 
 /**
  * Search input component.
@@ -22,59 +10,23 @@ const defaults = [
  * @returns {JSX.Element}
  */
 export default function SearchBar({ onSelect }) {
-  const [query, setQuery] = useState("");
-  const [items, setItems] = useState(defaults);
-  const [open, setOpen] = useState(false);
+  const { online } = useHealth();
+  // ... (states)
 
-  /**
-   * Trigger selection from query text for quick analyze flow.
-   */
-  function submitSearch() {
-    const normalized = String(query || "").trim().toUpperCase();
-    if (!normalized) {
-      return;
-    }
+  // ... (submitSearch)
 
-    const exact = items.find((item) => String(item.symbol).toUpperCase() === normalized);
-    const isLikelySymbol = /^[A-Z0-9&.-]{1,20}$/.test(normalized) && !normalized.includes(" ");
-    const picked = exact || (!isLikelySymbol && items.length ? items[0] : { symbol: normalized, name: normalized, exchange: "NSE" });
-    onSelect(picked);
-    setOpen(false);
-  }
-
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      try {
-        const { data } = await analysisApi.search(query.trim());
-        setItems(data?.length ? data : defaults);
-      } catch (error) {
-        setItems(defaults);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [query]);
+  // ... (useEffect)
 
   return (
     <div className="relative w-full">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              submitSearch();
-            }
-          }}
-          placeholder="Search Indian stocks: INFY, TCS, RELIANCE..."
-          className="w-full rounded-lg border border-white/20 bg-surface px-4 py-3 text-sm outline-none ring-primary/40 focus:ring"
-        />
+        {/* ... (input) */}
         <button
           type="button"
           onClick={submitSearch}
-          className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-black hover:bg-[#00c19a] sm:w-auto"
+          disabled={!online}
+          title={online ? "" : "Backend offline"}
+          className={`w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-black hover:bg-[#00c19a] sm:w-auto ${!online ? 'cursor-not-allowed opacity-50' : ''}`}
         >
           Search & Analyze
         </button>
