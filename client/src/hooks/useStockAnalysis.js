@@ -1,5 +1,6 @@
 /** Hook for fetching stock analysis payloads and handling loading/errors. */
 
+import { useCallback, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { analysisApi, getApiError } from "../utils/api";
 
@@ -12,13 +13,21 @@ export function useStockAnalysis() {
     mutationFn: (payload) => analysisApi.analyze(payload),
   });
 
-  return {
-    analyze: async (payload) => {
+  const analyze = useCallback(
+    async (payload) => {
       const response = await mutation.mutateAsync(payload);
       return response.data;
     },
-    data: mutation.data?.data || null,
-    loading: mutation.isPending,
-    error: mutation.error ? getApiError(mutation.error) : "",
-  };
+    [mutation]
+  );
+
+  return useMemo(
+    () => ({
+      analyze,
+      data: mutation.data?.data || null,
+      loading: mutation.isPending,
+      error: mutation.error ? getApiError(mutation.error) : "",
+    }),
+    [analyze, mutation.data, mutation.isPending, mutation.error]
+  );
 }

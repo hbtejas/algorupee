@@ -18,7 +18,9 @@ import RiskDisclaimer from "../components/shared/RiskDisclaimer";
 import { useStockAnalysis } from "../hooks/useStockAnalysis";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { useHealth } from "../context/HealthContext";
+import { useAuth } from "../context/AuthContext";
 import { analysisApi, portfolioApi, alertsApi } from "../utils/api";
+import { getApiError } from "../utils/api";
 import { formatCurrency, formatPercent } from "../utils/formatters";
 
 /**
@@ -28,11 +30,15 @@ import { formatCurrency, formatPercent } from "../utils/formatters";
 export default function StockDetail() {
   const { symbol } = useParams();
   const { online } = useHealth();
+  const { isAuthenticated } = useAuth();
   const { analyze, loading, error } = useStockAnalysis();
   const { connected, subscribeScore } = useWebSocket();
   const [analysis, setAnalysis] = useState(null);
   const [quoteUpdatedAt, setQuoteUpdatedAt] = useState("");
   const [sectorContext, setSectorContext] = useState(null);
+  const [actionLoading, setActionLoading] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionError, setActionError] = useState("");
 
   const badgeConfidenceRaw = Number(analysis?.recommendation?.confidence ?? analysis?.recommendation?.final_score ?? 50);
   const badgeConfidence = Math.max(0, Math.min(100, Number.isFinite(badgeConfidenceRaw) ? badgeConfidenceRaw : 50));
@@ -54,7 +60,7 @@ export default function StockDetail() {
     return () => {
       mounted = false;
     };
-  }, [symbol]);
+  }, [symbol, analyze]);
 
   useEffect(() => {
     if (!connected || !symbol) {
@@ -117,6 +123,51 @@ export default function StockDetail() {
     };
   }, [symbol]);
 
+  /** Add current stock to portfolio with valid payload for backend contract. */
+  async function onAddPortfolio() {
+    if (!analysis) {
+      return;
+    }
+    setActionError("");
+    setActionMessage("");
+    setActionLoading("portfolio");
+    try {
+      await portfolioApi.add({
+        symbol: String(symbol || "").toUpperCase(),
+        quantity: 1,
+        buyPrice: Number(analysis.current_price || 0),
+        buyDate: new Date().toISOString().slice(0, 10),
+      });
+      setActionMessage("Added to portfolio.");
+    } catch (err) {
+      setActionError(getApiError(err));
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  /** Create a default price-above alert for current symbol. */
+  async function onCreateAlert() {
+    if (!analysis) {
+      return;
+    }
+    setActionError("");
+    setActionMessage("");
+    setActionLoading("alert");
+    try {
+      await alertsApi.create({
+        symbol: String(symbol || "").toUpperCase(),
+        type: "PRICE_ABOVE",
+        threshold: Number(analysis.current_price || 0) * 1.05,
+      });
+      setActionMessage("Alert created.");
+    } catch (err) {
+      setActionError(getApiError(err));
+    } finally {
+      setActionLoading("");
+    }
+  }
+
   useEffect(() => {
     let active = true;
 
@@ -177,20 +228,20 @@ export default function StockDetail() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => portfolioApi.add({ symbol, price: analysis.current_price, quantity: 1 })}
-              disabled={!online}
-              title={online ? "" : "Backend offline"}
+              onClick={onAddPortfolio}
+              disabled={!online || !isAuthenticated || actionLoading === "portfolio"}
+              title={online ? (!isAuthenticated ? "Login required" : "") : "Backend offline"}
               className={`rounded border border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary hover:bg-primary/20 ${!online ? 'cursor-not-allowed opacity-50' : ''}`}
             >
-              + Portfolio
+              {actionLoading === "portfolio" ? "Adding..." : "+ Portfolio"}
             </button>
             <button
-              onClick={() => alertsApi.create({ symbol, type: 'PRICE_ABOVE', threshold: analysis.current_price * 1.05 })}
-              disabled={!online}
-              title={online ? "" : "Backend offline"}
+              onClick={onCreateAlert}
+              disabled={!online || !isAuthenticated || actionLoading === "alert"}
+              title={online ? (!isAuthenticated ? "Login required" : "") : "Backend offline"}
               className={`rounded border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 hover:bg-white/10 ${!online ? 'cursor-not-allowed opacity-50' : ''}`}
             >
-              Set Alert
+              {actionLoading === "alert" ? "Creating..." : "Set Alert"}
             </button>
           </div>
         </div>
@@ -204,6 +255,8 @@ export default function StockDetail() {
       </div>
 
       <p className="text-xs text-white/60">Live score feed: {connected ? "Connected" : "Disconnected"} (updates every 60s during 09:15-15:30 IST)</p>
+      {actionMessage && <p className="text-xs text-buy">{actionMessage}</p>}
+      {actionError && <p className="text-xs text-sell">{actionError}</p>}
       {quoteUpdatedAt && <p className="text-xs text-white/50">Realtime price updated: {new Date(quoteUpdatedAt).toLocaleTimeString()}</p>}
 
       <div className="grid gap-4 xl:grid-cols-[2fr,1fr]">
